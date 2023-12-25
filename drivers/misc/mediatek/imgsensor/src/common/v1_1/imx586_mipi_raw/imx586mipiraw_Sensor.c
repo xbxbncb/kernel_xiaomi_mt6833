@@ -99,16 +99,16 @@ static struct imgsensor_info_struct imgsensor_info = {
 		.max_framerate = 90,
 	},
 	.cap = { /*48M@9fps*/
-		.pclk = 864000000,
-		.linelength = 14704,
-		.framelength = 6528,
+		.pclk = 1728000000,
+		.linelength = 15744,
+		.framelength = 3658,
 		.startx = 0,
 		.starty = 0,
 		.grabwindow_width = 8000,
 		.grabwindow_height = 6000,
 		.mipi_data_lp2hs_settle_dc = 85,
-		.mipi_pixel_rate = 499200000,
-		.max_framerate = 90,
+		.mipi_pixel_rate = 1711540000,
+		.max_framerate = 300, /* 60fps */
 	},
 #else
 	.pre = { /* reg_J 4000x3000 @59.89fps*/
