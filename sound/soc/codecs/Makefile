@@ -501,6 +501,8 @@ obj-$(CONFIG_SND_SOC_RT5512)	+= snd-soc-rt5512.o
 obj-$(CONFIG_SND_SOC_MT6660)	+= snd-soc-mt6660.o
 obj-$(CONFIG_SND_SOC_SMARTPAINFO)	+= snd-soc-smartpa-info.o
 obj-$(CONFIG_SND_SOC_AW87339)	+= aw87339/
+obj-$(CONFIG_SND_SOC_SIA8109)   += sia81xx/
+obj-$(CONFIG_SND_SOC_AW87XXX)   += aw87xxx/
 obj-$(CONFIG_SND_SOC_AS33970)	+= as33970/
 obj-$(CONFIG_SND_SOC_CS35L41)	+= cs35l41/
 
