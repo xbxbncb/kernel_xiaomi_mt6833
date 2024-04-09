@@ -26,12 +26,33 @@
 
 #include <linux/errno.h>
 #include <linux/list.h>
+#include <linux/notifier.h>
+#include <linux/err.h>
 
 struct device_node;
 struct drm_connector;
 struct drm_device;
 struct drm_panel;
 struct display_timing;
+
+
+/* A hardware display blank change occurred */
+#define DRM_PANEL_EVENT_BLANK		0x01
+/* A hardware display blank early change occurred */
+#define DRM_PANEL_EARLY_EVENT_BLANK	0x02
+
+enum {
+	/* panel: power on */
+	DRM_PANEL_BLANK_UNBLANK,
+	/* panel: power off */
+	DRM_PANEL_BLANK_POWERDOWN,
+};
+
+struct drm_panel_notifier {
+	int refresh_rate;
+	void *data;
+	uint32_t id;
+};
 
 /**
  * struct drm_panel_funcs - perform operations on a given panel
@@ -84,6 +105,7 @@ struct drm_panel_funcs {
  * @dev: parent device of the panel
  * @funcs: operations that can be performed on the panel
  * @list: panel entry in registry
+ * @nh: panel notifier list head
  */
 struct drm_panel {
 	struct drm_device *drm;
@@ -93,6 +115,8 @@ struct drm_panel {
 	const struct drm_panel_funcs *funcs;
 
 	struct list_head list;
+
+	struct blocking_notifier_head nh;
 };
 
 /**
@@ -193,6 +217,13 @@ void drm_panel_remove(struct drm_panel *panel);
 
 int drm_panel_attach(struct drm_panel *panel, struct drm_connector *connector);
 int drm_panel_detach(struct drm_panel *panel);
+
+int drm_panel_notifier_register(struct drm_panel *panel,
+		struct notifier_block *nb);
+int drm_panel_notifier_unregister(struct drm_panel *panel,
+		struct notifier_block *nb);
+int drm_panel_notifier_call_chain(struct drm_panel *panel,
+		unsigned long val, void *v);
 
 #if defined(CONFIG_OF) && defined(CONFIG_DRM_PANEL)
 struct drm_panel *of_drm_find_panel(const struct device_node *np);
