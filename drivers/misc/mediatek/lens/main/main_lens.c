@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2021 XiaoMi, Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -289,6 +290,26 @@ void AFRegulatorCtrl(int Stage)
 				#elif defined(CONFIG_MACH_MT6771)
 				regVCAMAF =
 					regulator_get(lens_device, "vldo28");
+				#elif defined(CONFIG_MACH_MT6833)
+				if (strncmp(CONFIG_ARCH_MTK_PROJECT,
+					"k6833v1_64_6360_alpha", 20) == 0) {
+					regVCAMAF =
+					regulator_get(lens_device, "vmch");
+				} else if (strncmp(CONFIG_ARCH_MTK_PROJECT,
+					"k6833v1_64", 10) == 0) {
+					regVCAMAF =
+					regulator_get(lens_device, "vibr");
+				} else {
+					#if defined(CONFIG_REGULATOR_MT6317)
+					regVCAMAF =
+					regulator_get(lens_device, "mt6317-ldo3");
+					LOG_INF("regulator_get(%s)\n", "mt6317-ldo3");
+					#else
+					regVCAMAF =
+					regulator_get(lens_device, "vcamio");
+					LOG_INF("regulator_get(%s)\n", "vcamio");
+					#endif
+				}
 				#elif defined(CONFIG_MACH_MT6853)
 				if (strncmp(CONFIG_ARCH_MTK_PROJECT,
 					"k6853v1_64_6360_alpha", 20) == 0) {
