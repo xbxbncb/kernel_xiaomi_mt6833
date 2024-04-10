@@ -250,6 +250,7 @@ config MTK_SENSOR_ARCHITECTURE
 	  with mediatek sensor architecture.
 	  If unsure, set dummy.
 
+source "drivers/misc/mediatek/elliptic/Kconfig"
 source "drivers/misc/mediatek/sensors-1.0/Kconfig"
 source "drivers/misc/mediatek/sensor/2.0/Kconfig"
 endmenu  # Sensors
