@@ -65,6 +65,46 @@ unlock:
 }
 static DEVICE_ATTR_RW(brightness);
 
+extern int hbm_brightness_set(int level);
+extern int hbm_brightness_get(void);
+
+static ssize_t hbm_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	unsigned long state;
+	ssize_t ret;
+
+	mutex_lock(&led_cdev->led_access);
+
+	if (led_sysfs_is_disabled(led_cdev)) {
+		ret = -EBUSY;
+		goto unlock;
+	}
+
+	ret = kstrtoul(buf, 10, &state);
+	if (ret)
+		goto unlock;
+	hbm_brightness_set(state);
+
+	ret = size;
+unlock:
+	mutex_unlock(&led_cdev->led_access);
+	return ret;
+}
+
+static ssize_t hbm_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+
+	int hbm_status;
+	hbm_status = hbm_brightness_get();
+	return sprintf(buf, "%u\n", hbm_status);
+}
+
+static DEVICE_ATTR_RW(hbm);
+
 static ssize_t max_brightness_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -88,6 +128,7 @@ static const struct attribute_group led_trigger_group = {
 static struct attribute *led_class_attrs[] = {
 	&dev_attr_brightness.attr,
 	&dev_attr_max_brightness.attr,
+	&dev_attr_hbm.attr,
 	NULL,
 };
 
