@@ -944,6 +944,7 @@ struct mtk_battery {
 	struct battery_temperature_table rbat;
 
 	struct fgd_cmd_param_t_custom fg_data;
+	bool charging_call_state;
 };
 
 
