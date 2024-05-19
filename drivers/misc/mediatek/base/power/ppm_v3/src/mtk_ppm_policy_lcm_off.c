@@ -80,6 +80,8 @@ static void ppm_lcmoff_status_change_cb(bool enable)
 	FUNC_EXIT(FUNC_LV_POLICY);
 }
 
+extern int set_jeita_lcd_on_off(bool onoff);
+
 static void ppm_lcmoff_switch(int onoff)
 {
 	unsigned int i;
@@ -87,6 +89,8 @@ static void ppm_lcmoff_switch(int onoff)
 	FUNC_ENTER(FUNC_LV_POLICY);
 
 	ppm_info("@%s: onoff = %d\n", __func__, onoff);
+	set_jeita_lcd_on_off(onoff);
+
 
 	ppm_lock(&lcmoff_policy.lock);
 
