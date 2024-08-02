@@ -26,6 +26,7 @@ struct mt6360_chg_platform_data {
 	u32 mivr;
 	u32 cv;
 	u32 ieoc;
+	u32 vrechg;
 	u32 safety_timer;
 	u32 ircmp_resistor;
 	u32 ircmp_vclamp;
