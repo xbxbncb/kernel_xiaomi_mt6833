@@ -2079,7 +2079,7 @@ static int32_t nvt_selftest_open(struct inode *inode, struct file *file)
 }
 
 /******************************************/
-static int32_t nvt_selftest_open_sale()
+static int32_t nvt_selftest_open_sale(void)
 {
 	struct device_node *np = ts->client->dev.of_node;
 	unsigned char mpcriteria[32] = {0};	//novatek-mp-criteria-default
