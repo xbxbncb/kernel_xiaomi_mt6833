@@ -55,6 +55,7 @@
 			safety_timer = <12>;		/* hour */
 			ircmp_resistor = <25000>;	/* uohm */
 			ircmp_vclamp = <32000>;		/* uV */
+			vrechg = <100000>;
 			en_te = <1>;
 			en_wdt = <1>;
 			en_otg_wdt = <1>;
@@ -170,6 +171,8 @@
 				  "ldo3_oc_evt", "ldo5_oc_evt",
 				  "ldo1_pgb_evt", "ldo2_pgb_evt",
 				  "ldo3_pgb_evt", "ldo5_pgb_evt";
+		sdcard_det_en = <1>;
+		sdcard_hlact = <0>;
 		mt_pmic_vfp_ldo_reg: ldo1 {
 			regulator-compatible = "LDO1";
 			regulator-name = "VFP";
