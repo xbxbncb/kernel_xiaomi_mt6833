@@ -1,6 +1,10 @@
 # 使用教程
 ## 1. 自行 git 本项目编译
-### 1. 安装编译所需工具链
+### 1. 选择你需要的支线
+main：主线，默认不编译KernelSU Next
+ksunext：默认编译KernelSU Next
+ksunext-susfs：默认编译KernelSU Next和SUSFS
+### 2. 安装编译所需工具链
 推荐使用 debian 12 或 ubuntu 18.04 进行编译
 ```
 sudo apt update && sudo apt install -y build-essential clang lld \
@@ -9,7 +13,7 @@ gperf imagemagick liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev \
 libxml2 libxml2-utils lzop pngcrush rsync schedtool \
 squashfs-tools xsltproc zip zlib1g-dev gcc-aarch64-linux-gnu
 ```
-### 2. 开始编译
+### 3. 开始编译
 配置 ccache（二次编译时加速）
 ```
 #开启 ccache
@@ -34,7 +38,7 @@ make -j$(nproc --all) O=out \
                    -Wno-unused-variable -Wno-unused-function -Wno-unused-label" \
           evergo_defconfig
 ```
-开始编译（注意：默认编译KernelSU Next和SUSFS，如不需要请手动修改配置文件）
+开始编译
 ```
 make -j$(nproc --all) O=out \
           CC="ccache clang" \
@@ -52,7 +56,7 @@ make -j$(nproc --all) O=out \
 若一切顺利，编译产物会生成于out/arch/arm64/boot/Image.gz-dtb
 使用AnyKernel3打包后进行刷入即可
 ## 2.使用 Github Actions 编译
-即将到来
+本项目已经支持 Github Actions 编译，fork 本项目后，<br>在 Actions -> All workflows -> Auto Kernel Builder -> 点击 run workflow -> 选择 main 分支 -> 开始编译<br>等待编译完成后会有三个产物，分别是AnyKernel3-ksunext-susfs.zip、AnyKernel3-ksunext.zip 和 AnyKernel3-main.zip，分别是带KernelSU Next的版本、带KernelSU Next和SUSFS 1.5.5的版本以及不带KernelSU Next的版本，先解压一下，解压出来就是AnyKernel3卡刷包，然后才能刷入
 
 Linux kernel
 ============
