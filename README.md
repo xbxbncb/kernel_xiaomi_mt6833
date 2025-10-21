@@ -11,7 +11,7 @@ sudo apt update && sudo apt install -y build-essential clang lld \
 libssl-dev libelf-dev flex bison bc ccache curl git git-lfs gnupg \
 gperf imagemagick liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev \
 libxml2 libxml2-utils lzop pngcrush rsync schedtool \
-squashfs-tools xsltproc zip zlib1g-dev gcc-aarch64-linux-gnu
+squashfs-tools xsltproc zip zlib1g-dev gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi llvm llvm-tools
 ```
 ### 3. 开始编译
 配置 ccache（二次编译时加速）
@@ -56,7 +56,7 @@ make -j$(nproc --all) O=out \
 若一切顺利，编译产物会生成于out/arch/arm64/boot/Image.gz-dtb
 使用AnyKernel3打包后进行刷入即可
 ## 2.使用 Github Actions 编译
-本项目已经支持 Github Actions 编译，fork 本项目后，<br>在 Actions -> All workflows -> Auto Kernel Builder -> 点击 run workflow -> 选择 main 分支 -> 开始编译<br>等待编译完成后会有三个产物，分别是AnyKernel3-ksunext-susfs.zip、AnyKernel3-ksunext.zip 和 AnyKernel3-main.zip，分别是带KernelSU Next的版本、带KernelSU Next和SUSFS 1.5.5的版本以及不带KernelSU Next的版本，先解压一下，解压出来就是AnyKernel3卡刷包，然后才能刷入
+本项目已经支持 Github Actions 编译，fork 本项目后，<br>在 Actions -> All workflows -> Auto Kernel Builder -> 点击 run workflow -> 选择 main 分支 -> 开始编译<br>等待编译完成后会有三个产物，分别是<br>AnyKernel3-ksunext-susfs.zip、<br>AnyKernel3-ksunext.zip<br>和AnyKernel3-main.zip，分别是<br>带KernelSU Next的版本、<br>带KernelSU Next和SUSFS 1.5.5的版本<br>以及不带KernelSU Next的版本，先解压一下，解压出来就是AnyKernel3卡刷包，然后才能刷入
 
 Linux kernel
 ============
