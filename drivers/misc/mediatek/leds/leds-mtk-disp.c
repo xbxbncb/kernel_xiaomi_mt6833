@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2018 MediaTek Inc.
- *
+ * Modified to register both backlight and leds devices (dual-node)
  */
 
 #include <linux/ctype.h>
@@ -15,6 +15,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/workqueue.h>
+#include <linux/backlight.h>
 
 #include "leds-mtk-disp.h"
 
@@ -49,7 +50,7 @@ struct led_debug_info {
 
 struct led_desp {
 	int index;
-	char name[16];
+	char name[32];
 };
 
 struct leds_desp_info {
@@ -60,10 +61,12 @@ struct leds_desp_info {
 struct mtk_led_data {
 	struct led_desp desp;
 	struct led_conf_info conf;
+	struct backlight_device *bd; /* backlight device */
 	int last_level;
 	int brightness;
 	struct mtk_leds_info	*parent;
 	struct led_debug_info debug;
+	char bl_name[32]; /* backlight device name */
 };
 
 struct mtk_leds_info {
@@ -150,6 +153,9 @@ static void led_debug_log(struct mtk_led_data *s_led,
 static int getLedDespIndex(char *name)
 {
 	int i = 0;
+
+	if (!leds_info)
+		return -1;
 
 	while (i < leds_info->lens) {
 		if (!strcmp(name, leds_info->leds[i]->name))
@@ -250,41 +256,93 @@ int mt_leds_brightness_set(char *name, int level)
 }
 EXPORT_SYMBOL(mt_leds_brightness_set);
 
-static int led_level_set(struct led_classdev *led_cdev,
-					  enum led_brightness brightness)
+/* backlight callbacks */
+static int mtk_backlight_update_status(struct backlight_device *bd)
 {
-	int trans_level = 0;
+	struct mtk_led_data *led_dat = bl_get_data(bd);
+	int brightness = bd->props.brightness;
 
-	struct led_conf_info *led_conf =
-		container_of(led_cdev, struct led_conf_info, cdev);
-	struct mtk_led_data *led_dat =
-		container_of(led_conf, struct mtk_led_data, conf);
+	if (!led_dat)
+		return -EINVAL;
+
+	/*
+	 * Turn off the backlight when power != FB_BLANK_UNBLANK
+	 */
+	if (bd->props.power != FB_BLANK_UNBLANK) {
+		pr_info("backlight: power off (state=%d)\n", bd->props.power);
+#ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
+		call_notifier(2, led_dat);
+#endif
+		led_level_disp_set(led_dat, 0);
+		led_dat->brightness = 0;
+		led_dat->conf.cdev.brightness = 0;
+		return 0;
+	}
 
 	if (led_dat->brightness == brightness)
 		return 0;
 
-	trans_level = (
-		(((1 << led_dat->conf.trans_bits) - 1) * brightness
-		+ (((1 << led_dat->conf.led_bits) - 1) / 2))
-		/ ((1 << led_dat->conf.led_bits) - 1));
-
-	led_debug_log(led_dat, brightness, trans_level);
-
-#ifdef MET_USER_EVENT_SUPPORT
-	if (enable_met_backlight_tag())
-		output_met_backlight_tag(brightness);
-#endif
-
-led_dat->brightness = brightness;
+	pr_info("backlight: power on, brightness=%d\n", brightness);
+	led_dat->brightness = brightness;
 #ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
 	call_notifier(1, led_dat);
 #endif
-#ifdef CONFIG_MTK_AAL_SUPPORT
-	disp_pq_notify_backlight_changed(trans_level);
-#else
+	/* update hardware */
 	led_level_disp_set(led_dat, brightness);
-	led_dat->last_level = brightness;
+
+	/* keep leds class in sync */
+	led_dat->conf.cdev.brightness = brightness;
+
+	return 0;
+}
+
+static int mtk_backlight_get_brightness(struct backlight_device *bd)
+{
+	struct mtk_led_data *led_dat = bl_get_data(bd);
+	if (!led_dat)
+		return 0;
+	return led_dat->brightness;
+}
+
+static const struct backlight_ops mtk_backlight_ops = {
+	.update_status  = mtk_backlight_update_status,
+	.get_brightness = mtk_backlight_get_brightness,
+};
+
+/* leds callback */
+static int led_level_set(struct led_classdev *led_cdev,
+					  enum led_brightness brightness)
+{
+	struct mtk_led_data *led_dat =
+		container_of(led_cdev, struct mtk_led_data, conf.cdev);
+
+	if (!led_dat)
+		return -EINVAL;
+
+    /*
+     * If the backlight is in FB_BLANK_POWERDOWN state, brightness update will be disabled.
+     */
+    if (led_dat->bd && led_dat->bd->props.power != FB_BLANK_UNBLANK) {
+        pr_info("led: ignored brightness=%d because bl_power=%d\n",
+                brightness, led_dat->bd->props.power);
+        return 0;
+    }
+
+    if (led_dat->brightness == brightness) {
+        return 0;
+    }
+
+	led_dat->brightness = brightness;
+#ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
+	call_notifier(1, led_dat);
 #endif
+	led_level_disp_set(led_dat, brightness);
+
+	/* sync backlight props and trigger status update */
+	if (led_dat->bd) {
+		led_dat->bd->props.brightness = brightness;
+		backlight_update_status(led_dat->bd);
+	}
 	return 0;
 
 }
@@ -292,18 +350,39 @@ led_dat->brightness = brightness;
 static int led_data_init(struct device *dev, struct mtk_led_data *s_led)
 {
 	int ret;
+	struct backlight_properties props;
 
 	s_led->conf.cdev.flags = LED_CORE_SUSPENDRESUME;
 	s_led->conf.cdev.brightness_set_blocking = led_level_set;
+
+	/* prepare backlight name dynamically */
+	snprintf(s_led->bl_name, sizeof(s_led->bl_name),
+         	"panel%d-backlight", s_led->desp.index);
+
+	memset(&props, 0, sizeof(props));
+	props.type = BACKLIGHT_RAW;
+	props.max_brightness = s_led->conf.cdev.max_brightness;
+
+	s_led->bd = devm_backlight_device_register(dev,
+					s_led->bl_name, dev, s_led,
+					&mtk_backlight_ops, &props);
+	if (IS_ERR(s_led->bd)) {
+		pr_notice("backlight device register fail!\n");
+		return PTR_ERR(s_led->bd);
+	}
+
+	/* leds registration (keep original name for compatibility) */
+	ret = devm_led_classdev_register(dev, &s_led->conf.cdev);
+	if (ret < 0) {
+		pr_notice("led class register fail!\n");
+		return ret;
+	}
+
+	/* initialize defaults */
+	s_led->conf.cdev.brightness = s_led->conf.cdev.max_brightness;
 	s_led->brightness = s_led->conf.cdev.max_brightness;
 	s_led->conf.level = s_led->conf.cdev.max_brightness;
 	s_led->last_level = s_led->conf.cdev.max_brightness;
-	ret = devm_led_classdev_register(dev, &(s_led->conf.cdev));
-	if (ret < 0) {
-		pr_notice("led class register fail!");
-		return ret;
-	}
-	pr_info("%s devm_led_classdev_register ok! ", s_led->conf.cdev.name);
 
 	ret = snprintf(s_led->debug.buffer + strlen(s_led->debug.buffer),
 		4095 - strlen(s_led->debug.buffer),
@@ -311,7 +390,12 @@ static int led_data_init(struct device *dev, struct mtk_led_data *s_led)
 	if (ret < 0 || ret >= 4096)
 		pr_info("print log init error!");
 
+	/* set hw to initial level */
 	led_level_set(&s_led->conf.cdev, s_led->conf.cdev.brightness);
+
+	pr_info("%s backlight(%s) and leds(%s) registered\n",
+			s_led->conf.cdev.name, s_led->bl_name, s_led->conf.cdev.name);
+
 	return 0;
 
 }
@@ -341,6 +425,11 @@ static int mtk_leds_parse_dt(struct device *dev,
 			ret = -EINVAL;
 			goto out_led_dt;
 		}
+
+		/* copy label into desp.name (safe buffer) */
+		strlcpy(s_led->desp.name, s_led->conf.cdev.name,
+				sizeof(s_led->desp.name));
+
 		ret = of_property_read_u32(child,
 			"led-bits", &(s_led->conf.led_bits));
 		if (ret) {
@@ -377,8 +466,7 @@ static int mtk_leds_parse_dt(struct device *dev,
 			num, s_led->conf.cdev.name,
 			s_led->conf.max_level,
 			s_led->conf.led_bits);
-		strncpy(s_led->desp.name, s_led->conf.cdev.name,
-			strlen(s_led->conf.cdev.name));
+
 		s_led->desp.index = num;
 		leds_info->leds[num] = &s_led->desp;
 		s_led->conf.cdev.brightness = level;
