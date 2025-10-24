@@ -141,9 +141,23 @@ jobs:
         name: AnyKernel3-${{ matrix.branch }}.zip
         path: AnyKernel3-${{ matrix.branch }}.zip
 
+    - name: Install GitHub CLI
+      run: sudo apt install -y gh
+
+    - name: Delete old cache before saving new
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "Deleting old cache (if exists)..."
+        cache_id=$(gh cache list --limit 1 | grep "kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}" | awk '{print $1}')
+        if [ -n "$cache_id" ]; then
+          gh cache delete "$cache_id" || true
+        fi
+
     - name: Save ccache
+      if: always()
       uses: actions/cache/save@v3
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}-${{ github.run_id }}
+        key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}
     
