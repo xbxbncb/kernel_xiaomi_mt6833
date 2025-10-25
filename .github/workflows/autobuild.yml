@@ -149,7 +149,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "Deleting old cache (if exists)..."
-        cache_id=$(gh cache list --limit 1 | grep "kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}" | awk '{print $1}')
+        cache_id=$(gh cache list | grep -P "\bkernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}\b(?!-)" | awk '{print $1}')
         if [ -n "$cache_id" ]; then
           gh cache delete "$cache_id" || true
         fi
