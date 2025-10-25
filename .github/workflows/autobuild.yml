@@ -112,11 +112,11 @@ jobs:
           evergo_defconfig
 
         if [ ${{ matrix.branch }} == ksunext-susfs ]; then
-          LOCALVERSION="${{ github.event.inputs.kernelversion }}-ksunext-${{ github.event.inputs.ksuversion }}-with-susfs-${{ github.event.inputs.susfsversion }}"
+          VERSION="${{ github.event.inputs.kernelversion }}-ksunext-${{ github.event.inputs.ksuversion }}-with-susfs-${{ github.event.inputs.susfsversion }}"
         elif [ ${{ matrix.branch }} == ksunext ]; then
-          LOCALVERSION="${{ github.event.inputs.kernelversion }}-ksunext-${{ github.event.inputs.ksuversion }}"
+          VERSION="${{ github.event.inputs.kernelversion }}-ksunext-${{ github.event.inputs.ksuversion }}"
         else
-          LOCALVERSION="${{ github.event.inputs.kernelversion }}"
+          VERSION="${{ github.event.inputs.kernelversion }}"
         fi
 
         make -j32 O=out \
@@ -134,7 +134,7 @@ jobs:
                    -Wno-unused-function \
                    -Wno-unused-label \
                    -Wno-incompatible-pointer-types" \
-          LOCALVERSION='-${LOCALVERSION}'
+          LOCALVERSION='-${VERSION}'
 
     - name: Package Kernel
       run: |
