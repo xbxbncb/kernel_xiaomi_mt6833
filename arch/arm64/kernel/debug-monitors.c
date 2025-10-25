@@ -88,22 +88,41 @@ static DEFINE_PER_CPU(int, kde_ref_count);
 
 void enable_debug_monitors(enum dbg_active_el el)
 {
-	u32 mdscr, enable = 0;
+    u32 mdscr, enable = 0;
+#ifdef CONFIG_KPROBES
+    unsigned int retry = 1000; /* max 1000 cycles (~<1ms) */
+#endif
 
-	WARN_ON(preemptible());
+    WARN_ON(preemptible());
 
-	if (this_cpu_inc_return(mde_ref_count) == 1)
-		enable = DBG_MDSCR_MDE;
+#ifdef CONFIG_KPROBES
+    /*
+     * Avoid race with kprobe handlers:
+     * If a kprobe is currently running on this CPU, we delay enabling
+     * debug monitors until the kprobe finishes. This prevents crashes
+     * observed with KernelSU/SUSFS hooks triggering enable_debug_monitors
+     * while the CPU debug monitor is already in use.
+     */
+    while (kprobe_running() && retry--) {
+        /* cpu_relax gives the CPU a hint to reduce power/priority spin cost */
+        cpu_relax();
+    }
+    if (retry == 0)
+        pr_warn_once("debug_monitor: timeout waiting for kprobe to finish\n");
+#endif
 
-	if (el == DBG_ACTIVE_EL1 &&
-	    this_cpu_inc_return(kde_ref_count) == 1)
-		enable |= DBG_MDSCR_KDE;
+    if (this_cpu_inc_return(mde_ref_count) == 1)
+        enable = DBG_MDSCR_MDE;
 
-	if (enable && debug_enabled) {
-		mdscr = mdscr_read();
-		mdscr |= enable;
-		mdscr_write(mdscr);
-	}
+    if (el == DBG_ACTIVE_EL1 &&
+        this_cpu_inc_return(kde_ref_count) == 1)
+        enable |= DBG_MDSCR_KDE;
+
+    if (enable && debug_enabled) {
+        mdscr = mdscr_read();
+        mdscr |= enable;
+        mdscr_write(mdscr);
+    }
 }
 NOKPROBE_SYMBOL(enable_debug_monitors);
 
@@ -412,8 +431,18 @@ void user_regs_reset_single_step(struct user_pt_regs *regs,
 /* Kernel API */
 void kernel_enable_single_step(struct pt_regs *regs)
 {
+#ifdef CONFIG_KPROBES
+    unsigned int retry = 1000;
+#endif
 	WARN_ON(!irqs_disabled());
 	set_regs_spsr_ss(regs);
+#ifdef CONFIG_KPROBES
+    while (kprobe_running() && retry--) {
+        cpu_relax();
+    }
+    if (retry == 0)
+        pr_warn_once("debug_monitor: timeout waiting for kprobe to finish (disable)\n");
+#endif
 	mdscr_write(mdscr_read() | DBG_MDSCR_SS);
 	enable_debug_monitors(DBG_ACTIVE_EL1);
 }
@@ -421,7 +450,17 @@ NOKPROBE_SYMBOL(kernel_enable_single_step);
 
 void kernel_disable_single_step(void)
 {
+#ifdef CONFIG_KPROBES
+    unsigned int retry = 1000;
+#endif
 	WARN_ON(!irqs_disabled());
+#ifdef CONFIG_KPROBES
+    while (kprobe_running() && retry--) {
+        cpu_relax();
+    }
+    if (retry == 0)
+        pr_warn_once("debug_monitor: timeout waiting for kprobe to finish (disable)\n");
+#endif
 	mdscr_write(mdscr_read() & ~DBG_MDSCR_SS);
 	disable_debug_monitors(DBG_ACTIVE_EL1);
 }
