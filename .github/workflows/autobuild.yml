@@ -3,6 +3,19 @@ on:
    push:
       branches: [main,ksunext,ksunext-susfs]
    workflow_dispatch:
+      inputs:
+         ksuversion:
+            description: "请输入 KernelSU Next 的版本号"
+            required: false
+            default: "1.1.1"
+         susfsversion:
+            description: "请输入 SUSFS 的版本号"
+            required: false
+            default: "1.5.5"
+         kernelversion:
+            description: "请输入版本号"
+            required: false
+            default: "v1.0"
 
 jobs:
   build:
@@ -98,6 +111,14 @@ jobs:
                    -Wno-incompatible-pointer-types" \
           evergo_defconfig
 
+        if [ ${{ matrix.branch }} == ksunext-susfs ]; then
+          LOCALVERSION="${{ github.event.inputs.kernelversion }}-ksunext-${{ github.event.inputs.ksuversion }}-with-susfs-${{ github.event.inputs.susfsversion }}"
+        elif [ ${{ matrix.branch }} == ksunext ]; then
+          LOCALVERSION="${{ github.event.inputs.kernelversion }}-ksunext-${{ github.event.inputs.ksuversion }}"
+        else
+          LOCALVERSION="${{ github.event.inputs.kernelversion }}"
+        fi
+
         make -j32 O=out \
           CC="ccache clang" \
           LD=ld.lld \
@@ -112,7 +133,8 @@ jobs:
                    -Wno-unused-variable \
                    -Wno-unused-function \
                    -Wno-unused-label \
-                   -Wno-incompatible-pointer-types"
+                   -Wno-incompatible-pointer-types" \
+          LOCALVERSION='-${LOCALVERSION}'
 
     - name: Package Kernel
       run: |
@@ -122,10 +144,10 @@ jobs:
 
         sed -i 's/device\.name1=.*/device.name1=evergo/' anykernel.sh
         sed -i '/device\.name[2-5]=.*/d' anykernel.sh
-        if [ ${{matrix.branch }} == ksunext ]; then
-          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel patched KernelSU Next 1.1.1 4.14.336 by 酷安@孤独不能/' anykernel.sh
-        elif [ ${{matrix.branch }} == ksunext-susfs ]; then
-          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel patched KernelSU Next 1.1.1 and SUSFS 1.5.5 4.14.336 by 酷安@孤独不能/' anykernel.sh
+        if [ ${{ matrix.branch }} == ksunext ]; then
+          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel 4.14.336 patched KernelSU Next 1.1.1 by 酷安@孤独不能/' anykernel.sh
+        elif [ ${{ matrix.branch }} == ksunext-susfs ]; then
+          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel 4.14.336 patched KernelSU Next 1.1.1 and SUSFS 1.5.5 by 酷安@孤独不能/' anykernel.sh
         else
           sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel 4.14.336 by 酷安@孤独不能/' anykernel.sh
         fi
