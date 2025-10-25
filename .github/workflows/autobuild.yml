@@ -119,8 +119,8 @@ jobs:
           VERSION="${{ github.event.inputs.kernelversion }}"
         fi
 
-        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-perf-${VERSION}"' out/.config
-        sed -i 's/CONFIG_LOCALVERSION_AUTO=y/CONFIG_LOCALVERSION_AUTO=n' out/.config
+        sed -i 's/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION="-perf-${VERSION}"/' out/.config
+        sed -i 's/CONFIG_LOCALVERSION_AUTO=y/CONFIG_LOCALVERSION_AUTO=n/' out/.config
 
         make -j32 O=out \
           CC="ccache clang" \
