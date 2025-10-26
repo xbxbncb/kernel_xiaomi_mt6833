@@ -3,6 +3,23 @@ on:
    push:
       branches: [main,ksunext,ksunext-susfs]
    workflow_dispatch:
+      inputs:
+         ksuversion:
+            description: "请输入 KernelSU Next 的版本号"
+            required: true
+            default: "1.1.1"
+         susfsversion:
+            description: "请输入 SUSFS 的版本号"
+            required: true
+            default: "1.5.5"
+         kernelversion:
+            description: "请输入内核版本号"
+            required: true
+            default: "4.14.336"
+         version:
+            description: "请输入版本号"
+            required: true
+            default: "Unknow"
 
 jobs:
   build:
@@ -98,6 +115,16 @@ jobs:
                    -Wno-incompatible-pointer-types" \
           evergo_defconfig
 
+        if [ ${{ matrix.branch }} == ksunext-susfs ]; then
+          VERSION="${{ github.event.inputs.version }}-ksunext-${{ github.event.inputs.ksuversion }}-with-susfs-${{ github.event.inputs.susfsversion }}"
+        elif [ ${{ matrix.branch }} == ksunext ]; then
+          VERSION="${{ github.event.inputs.version }}-ksunext-${{ github.event.inputs.ksuversion }}"
+        else
+          VERSION="${{ github.event.inputs.version }}"
+        fi
+
+        echo "-${VERSION}" > .scmversion
+
         make -j32 O=out \
           CC="ccache clang" \
           LD=ld.lld \
@@ -122,12 +149,12 @@ jobs:
 
         sed -i 's/device\.name1=.*/device.name1=evergo/' anykernel.sh
         sed -i '/device\.name[2-5]=.*/d' anykernel.sh
-        if [ ${{matrix.branch }} == ksunext ]; then
-          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel patched KernelSU Next 1.1.1 4.14.336 by 酷安@孤独不能/' anykernel.sh
-        elif [ ${{matrix.branch }} == ksunext-susfs ]; then
-          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel patched KernelSU Next 1.1.1 and SUSFS 1.5.5 4.14.336 by 酷安@孤独不能/' anykernel.sh
+        if [ ${{ matrix.branch }} == ksunext ]; then
+          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel ${{ github.event.inputs.kernelversion }} (${{ github.event.inputs.version }}) patched KernelSU Next ${{ github.event.inputs.ksuversion }} by 酷安@孤独不能/' anykernel.sh
+        elif [ ${{ matrix.branch }} == ksunext-susfs ]; then
+          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel ${{ github.event.inputs.kernelversion }} (${{ github.event.inputs.version }}) patched KernelSU Next ${{ github.event.inputs.ksuversion }} and SUSFS ${{ github.event.inputs.susfsversion }} by 酷安@孤独不能/' anykernel.sh
         else
-          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel 4.14.336 by 酷安@孤独不能/' anykernel.sh
+          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel ${{ github.event.inputs.kernelversion }} (${{ github.event.inputs.version }}) by 酷安@孤独不能/' anykernel.sh
         fi
         sed -i 's/BLOCK=.*/BLOCK=boot/' anykernel.sh
         sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=auto/' anykernel.sh
@@ -149,7 +176,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "Deleting old cache (if exists)..."
-        cache_id=$(gh cache list --limit 1 | grep "kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}" | awk '{print $1}')
+        cache_id=$(gh cache list | grep -P "\bkernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}\b(?!-)" | awk '{print $1}')
         if [ -n "$cache_id" ]; then
           gh cache delete "$cache_id" || true
         fi
