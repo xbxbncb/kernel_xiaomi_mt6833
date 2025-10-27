@@ -14,6 +14,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
+#include <linux/cpufreq.h>
 
 #include "mtk_cpufreq_internal.h"
 #include "mtk_cpufreq_hybrid.h"
@@ -229,15 +230,17 @@ static ssize_t cpufreq_oppidx_proc_write(struct file *file,
 /* cpufreq_freq */
 static int cpufreq_freq_proc_show(struct seq_file *m, void *v)
 {
-	struct mt_cpu_dvfs *p = m->private;
-	struct pll_ctrl_t *pll_p = id_to_pll_ctrl(p->Pll_id);
+    struct mt_cpu_dvfs *p = m->private;
+    struct cpufreq_policy *policy;
 
-	if (pll_p == NULL)
-		return 0;
+    policy = cpufreq_cpu_get(p->cpu_id);
+    if (!policy)
+        return 0;
 
-	seq_printf(m, "%d KHz\n", pll_p->pll_ops->get_cur_freq(pll_p));
+    seq_printf(m, "%u KHz\n", policy->cur);
+    cpufreq_cpu_put(policy);
 
-	return 0;
+    return 0;
 }
 
 static ssize_t cpufreq_freq_proc_write(struct file *file,
