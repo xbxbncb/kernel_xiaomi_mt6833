@@ -15,7 +15,7 @@ on:
          kernelversion:
             description: "请输入内核版本号"
             required: true
-            default: "4.14.336"
+            default: "4.14.356-openela-rc1"
          version:
             description: "请输入版本号"
             required: true
@@ -116,7 +116,7 @@ jobs:
           evergo_defconfig
 
         if [ ${{ matrix.branch }} == ksunext-susfs ]; then
-          VERSION="${{ github.event.inputs.version }}-ksunext-${{ github.event.inputs.ksuversion }}-with-susfs-${{ github.event.inputs.susfsversion }}"
+          VERSION="${{ github.event.inputs.version }}-ksunext-${{ github.event.inputs.ksuversion }}-susfs-${{ github.event.inputs.susfsversion }}"
         elif [ ${{ matrix.branch }} == ksunext ]; then
           VERSION="${{ github.event.inputs.version }}-ksunext-${{ github.event.inputs.ksuversion }}"
         else
@@ -159,14 +159,28 @@ jobs:
         sed -i 's/BLOCK=.*/BLOCK=boot/' anykernel.sh
         sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=auto/' anykernel.sh
         
-        zip -r ../AnyKernel3-${{ matrix.branch }}.zip *
+        if [ ${{ matrix.branch }} == ksunext ]; then
+          zip -r ../AnyKernel3-evergo-${{ github.event.inputs.version }}-ksunext-${{ github.event.inputs.ksuversion }}.zip *
+        elif [ ${{ matrix.branch }} == ksunext-susfs ]; then
+          zip -r ../AnyKernel3-evergo-${{ github.event.inputs.version }}-ksunext-${{ github.event.inputs.ksuversion }}-susfs-${{ github.event.inputs.susfsversion }}.zip *
+        elif [ ${{ matrix.branch }} == main ]; then
+          zip -r ../AnyKernel3-evergo-${{ github.event.inputs.version }}-main.zip *
+        fi
         cd ..
+
+    - name: Set Artifact File
+      run: |
+        FILE=$(ls AnyKernel3-evergo-*.zip | head -n 1)
+        echo "Found artifact: $FILE"
+        echo "ARTIFACT_FILE=$FILE" >> $GITHUB_ENV
+        FILENAME=$(basename "$FILE" .zip)
+        echo "ARTIFACT_NAME=$FILENAME" >> $GITHUB_ENV
 
     - name: Upload AnyKernel3.zip
       uses: actions/upload-artifact@v4
       with:
-        name: AnyKernel3-${{ matrix.branch }}.zip
-        path: AnyKernel3-${{ matrix.branch }}.zip
+        path: ${{ env.ARTIFACT_FILE }}
+        name: ${{ env.ARTIFACT_NAME }}
 
     - name: Install GitHub CLI
       run: sudo apt install -y gh
