@@ -96,6 +96,10 @@ jobs:
         path: ${{ env.CCACHE_DIR }}
         key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}
     
+    - name: Submodule init (only for ksunext and ksunext-susfs)
+      if: contains(fromJSON('["ksunext", "ksunext-susfs"]'), github.ref_name)
+      run: git submodule update --init
+    
     - name: Build Kernel (ARM64 Cross-Compile)
       run: |
         make -j32 O=out \
@@ -141,10 +145,20 @@ jobs:
                    -Wno-unused-label \
                    -Wno-incompatible-pointer-types"
 
+    - name: KPatch-Next (only for ksunext and ksunext-susfs)
+      if: contains(fromJSON('["ksunext", "ksunext-susfs"]'), github.ref_name)
+      run: |
+        wget -O kpimg https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kpimg-linux
+        wget -O kptools https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kptools-linux
+        chmod 777 kpimg kptools
+        cp out/arch/arm64/boot/Image Image.old
+        ./kptools -p -i Image.old -k kpimg -o Image
+        cp -f Image out/arch/arm64/boot/Image
+
     - name: Package Kernel
       run: |
         git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
-        cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+        cp out/arch/arm64/boot/Image AnyKernel3/
         cd AnyKernel3
 
         sed -i 's/device\.name1=.*/device.name1=evergo/' anykernel.sh
