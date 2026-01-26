@@ -97,8 +97,10 @@ jobs:
         key: kernel-ccache-${{ runner.os }}-${{ env.ARCH }}-${{ matrix.branch }}
     
     - name: Submodule init (only for ksunext and ksunext-susfs)
-      if: contains(fromJSON('["ksunext", "ksunext-susfs"]'), github.ref_name)
-      run: git submodule update --init
+      run: |
+        if [ ${{ matrix.branch }} == ksunext ] || [ ${{ matrix.branch }} == ksunext-susfs ]; then
+          git submodule update --init
+        fi
     
     - name: Build Kernel (ARM64 Cross-Compile)
       run: |
@@ -148,12 +150,14 @@ jobs:
     - name: KPatch-Next (only for ksunext and ksunext-susfs)
       if: contains(fromJSON('["ksunext", "ksunext-susfs"]'), github.ref_name)
       run: |
-        wget -O kpimg https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kpimg-linux
-        wget -O kptools https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kptools-linux
-        chmod 777 kpimg kptools
-        cp out/arch/arm64/boot/Image Image.old
-        ./kptools -p -i Image.old -k kpimg -o Image
-        cp -f Image out/arch/arm64/boot/Image
+        if [ ${{ matrix.branch }} == ksunext ] || [ ${{ matrix.branch }} == ksunext-susfs ]; then
+          wget -O kpimg https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kpimg-linux
+          wget -O kptools https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kptools-linux
+          chmod 777 kpimg kptools
+          cp out/arch/arm64/boot/Image Image.old
+          ./kptools -p -i Image.old -k kpimg -o Image
+          cp -f Image out/arch/arm64/boot/Image
+        fi
 
     - name: Package Kernel
       run: |
