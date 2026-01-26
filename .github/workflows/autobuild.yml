@@ -148,7 +148,6 @@ jobs:
                    -Wno-incompatible-pointer-types"
 
     - name: KPatch-Next (only for ksunext and ksunext-susfs)
-      if: contains(fromJSON('["ksunext", "ksunext-susfs"]'), github.ref_name)
       run: |
         if [ ${{ matrix.branch }} == ksunext ] || [ ${{ matrix.branch }} == ksunext-susfs ]; then
           wget -O kpimg https://github.com/KernelSU-Next/KPatch-Next/releases/latest/download/kpimg-linux
