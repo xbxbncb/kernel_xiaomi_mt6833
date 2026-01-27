@@ -4,7 +4,8 @@
 main：主线，默认不编译KernelSU Next
 ksunext：默认编译KernelSU Next
 ksunext-susfs：默认编译KernelSU Next和SUSFS
-注意：不编译只是通过配置文件限制，而不是没有相关代码
+~~注意：不编译只是通过配置文件限制，而不是没有相关代码~~
+现在不再是配置文件限制，是真的没有对应代码，请选择好自己需要的支线
 ### 2. 安装编译所需工具链
 推荐使用 debian 12 或 ubuntu 18.04 进行编译
 ```
@@ -23,6 +24,10 @@ export USE_CCACHE=1
 
 #配置 ccache 缓存大小（根据自己实际情况调整）
 ccache -M 20G
+```
+若编译ksunext或ksunext-susfs支线，需要初始化一下子模块
+```
+git submodule update --init
 ```
 创建 .config 配置文件
 ```
@@ -68,7 +73,7 @@ AnyKernel3-ksunext-susfs.zip、
 AnyKernel3-ksunext.zip和
 AnyKernel3-main.zip，分别是
 带KernelSU Next的版本、
-带KernelSU Next和SUSFS 1.5.5的版本
+带KernelSU Next和SUSFS的版本
 以及不带KernelSU Next的版本，先解压一下，
 解压出来就是AnyKernel3卡刷包，然后才能刷入
 
