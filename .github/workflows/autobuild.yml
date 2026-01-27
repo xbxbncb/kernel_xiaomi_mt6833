@@ -7,11 +7,11 @@ on:
          ksuversion:
             description: "请输入 KernelSU Next 的版本号"
             required: true
-            default: "1.1.1"
+            default: "3.0.0"
          susfsversion:
             description: "请输入 SUSFS 的版本号"
             required: true
-            default: "1.5.5"
+            default: "2.0.0"
          kernelversion:
             description: "请输入内核版本号"
             required: true
@@ -19,7 +19,7 @@ on:
          version:
             description: "请输入版本号"
             required: true
-            default: "Unknow"
+            default: "vX.X.X"
 
 jobs:
   build:
