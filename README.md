@@ -1,10 +1,10 @@
 # 使用教程
 ## 1. 自行 git 本项目编译
 ### 1. 选择你需要的支线
-main：主线，默认不编译KernelSU Next
-ksunext：默认编译KernelSU Next
-ksunext-susfs：默认编译KernelSU Next和SUSFS
-~~注意：不编译只是通过配置文件限制，而不是没有相关代码~~
+main：主线，默认不编译KernelSU Next<br>
+ksunext：默认编译KernelSU Next<br>
+ksunext-susfs：默认编译KernelSU Next和SUSFS<br>
+~~注意：不编译只是通过配置文件限制，而不是没有相关代码~~<br>
 现在不再是配置文件限制，是真的没有对应代码，请选择好自己需要的支线
 ### 2. 安装编译所需工具链
 推荐使用 debian 12 或 ubuntu 18.04 进行编译
@@ -60,22 +60,19 @@ make -j$(nproc --all) O=out \
                    -Wno-implicit-function-declaration \
                    -Wno-unused-variable -Wno-unused-function -Wno-unused-label"
 ```
-若一切顺利，编译产物会生成于out/arch/arm64/boot/Image.gz-dtb
+若一切顺利，编译产物会生成于out/arch/arm64/boot/Image.gz-dtb<br>
 使用AnyKernel3打包后进行刷入即可
 ## 2.使用 Github Actions 编译
-本项目已经支持 Github Actions 编译，fork 本项目后，
-在 Actions -> All workflows ->
-Auto Kernel Builder -> 点击 run workflow ->
-选择 main 分支 -> 开始编译
-（那四个选项可以不用改，只跟显示的内核版本号和AnyKernel3有关）
-等待编译完成后会有三个产物，分别是
-AnyKernel3-ksunext-susfs.zip、
-AnyKernel3-ksunext.zip和
-AnyKernel3-main.zip，分别是
-带KernelSU Next的版本、
-带KernelSU Next和SUSFS的版本
-以及不带KernelSU Next的版本，先解压一下，
-解压出来就是AnyKernel3卡刷包，然后才能刷入
+本项目已经支持 Github Actions 编译，fork 本项目后，<br>
+在 Actions -> All workflows -> Auto Kernel Builder -> 点击 run workflow -> 选择 main 分支 -> 开始编译<br>
+（那四个选项可以不用改，只跟显示的内核版本号和AnyKernel3有关）<br>
+等待编译完成后会有三个产物，分别是<br>
+AnyKernel3-ksunext-susfs.zip、AnyKernel3-ksunext.zip和AnyKernel3-main.zip，
+分别是<br>
+带KernelSU Next的版本、<br>
+带KernelSU Next和SUSFS的版本<br>
+以及不带KernelSU Next的版本，<br>
+先解压一下，解压出来就是AnyKernel3卡刷包，然后才能刷入
 
 Linux kernel
 ============
