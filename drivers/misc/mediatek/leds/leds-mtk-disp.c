@@ -64,8 +64,6 @@ struct mtk_led_data {
 	struct backlight_device *bd; /* backlight device */
 	int last_level;
 	int brightness;
-	int last_brightness;
-	bool power;
 	struct mtk_leds_info	*parent;
 	struct led_debug_info debug;
 	char bl_name[32]; /* backlight device name */
@@ -261,58 +259,41 @@ EXPORT_SYMBOL(mt_leds_brightness_set);
 /* backlight callbacks */
 static int mtk_backlight_update_status(struct backlight_device *bd)
 {
-    struct mtk_led_data *led_dat = bl_get_data(bd);
-    int brightness = bd->props.brightness;
-    bool power = led_dat->power;
+	struct mtk_led_data *led_dat = bl_get_data(bd);
+	int brightness = bd->props.brightness;
 
-    /* Power off: Save the brightness */
-    if (bd->props.power != FB_BLANK_UNBLANK) {
-        /* Save the brightness before closing the screen. */
-        led_dat->last_brightness = led_dat->brightness;
+	if (!led_dat)
+		return -EINVAL;
 
-        pr_info("backlight: power off, save brightness=%d\n",
-                led_dat->last_brightness);
-
+	/*
+	 * Turn off the backlight when power != FB_BLANK_UNBLANK
+	 */
+	if (bd->props.power != FB_BLANK_UNBLANK) {
+		pr_info("backlight: power off (state=%d)\n", bd->props.power);
 #ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
-        call_notifier(2, led_dat);
+		call_notifier(2, led_dat);
 #endif
-        led_level_disp_set(led_dat, 0);
+		led_level_disp_set(led_dat, 0);
+		led_dat->brightness = 0;
+		led_dat->conf.cdev.brightness = 0;
+		return 0;
+	}
 
-        led_dat->brightness = 0;
-        led_dat->conf.cdev.brightness = 0;
-        led_dat->power = false;
-        return 0;
-    }
+	if (led_dat->brightness == brightness)
+		return 0;
 
-    /* Power on: Restore the brightness */
-    if (bd->props.power == FB_BLANK_UNBLANK) {
-        if (power) {
-            pr_info("backlight: power on, brightness=%d\n", brightness);
-
-            led_dat->brightness = brightness;
-	        led_dat->conf.cdev.brightness = brightness;
-	    } else {
-            int restore = led_dat->last_brightness;
-
-            if (restore <= 0)
-            restore = brightness;
-
-            pr_info("backlight: power on, restore brightness=%d\n", restore);
-
-            led_dat->brightness = restore;
-	        led_dat->conf.cdev.brightness = restore;
-	        led_dat->power = true;
-	        brightness = restore;
-	    }
-
+	pr_info("backlight: power on, brightness=%d\n", brightness);
+	led_dat->brightness = brightness;
 #ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
-        call_notifier(1, led_dat);
+	call_notifier(1, led_dat);
 #endif
-        led_level_disp_set(led_dat, brightness);
-        return 0;
-    }
+	/* update hardware */
+	led_level_disp_set(led_dat, brightness);
 
-    return 0;
+	/* keep leds class in sync */
+	led_dat->conf.cdev.brightness = brightness;
+
+	return 0;
 }
 
 static int mtk_backlight_get_brightness(struct backlight_device *bd)
@@ -402,7 +383,6 @@ static int led_data_init(struct device *dev, struct mtk_led_data *s_led)
 	s_led->brightness = s_led->conf.cdev.max_brightness;
 	s_led->conf.level = s_led->conf.cdev.max_brightness;
 	s_led->last_level = s_led->conf.cdev.max_brightness;
-	s_led->power = true;
 
 	ret = snprintf(s_led->debug.buffer + strlen(s_led->debug.buffer),
 		4095 - strlen(s_led->debug.buffer),
