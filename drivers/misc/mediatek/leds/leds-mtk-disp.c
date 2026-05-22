@@ -66,7 +66,6 @@ struct mtk_led_data {
 	int brightness;
 	int last_brightness;
 	bool power;
-	bool after_boot;
 	struct mtk_leds_info	*parent;
 	struct led_debug_info debug;
 	char bl_name[32]; /* backlight device name */
@@ -265,7 +264,6 @@ static int mtk_backlight_update_status(struct backlight_device *bd)
     struct mtk_led_data *led_dat = bl_get_data(bd);
     int brightness = bd->props.brightness;
     bool power = led_dat->power;
-    bool after_boot = led_dat->after_boot;
 
     /* Power off: Save the brightness */
     if (bd->props.power != FB_BLANK_UNBLANK) {
@@ -282,21 +280,17 @@ static int mtk_backlight_update_status(struct backlight_device *bd)
 
         led_dat->brightness = 0;
         led_dat->conf.cdev.brightness = 0;
-        power = false;
+        led_dat->power = false;
         return 0;
     }
 
     /* Power on: Restore the brightness */
     if (bd->props.power == FB_BLANK_UNBLANK) {
         if (power) {
-            if (!after_boot && brightness == 0) {
-                pr_warn("backlight: power on, ignore 0 brightness during booting\n");
-                
-                after_boot = true;
-                return 0;
-            } else {
-                pr_info("backlight: power on, brightness=%d\n", brightness);
-	        }
+            pr_info("backlight: power on, brightness=%d\n", brightness);
+
+            led_dat->brightness = brightness;
+	        led_dat->conf.cdev.brightness = brightness;
 	    } else {
             int restore = led_dat->last_brightness;
 
@@ -305,12 +299,12 @@ static int mtk_backlight_update_status(struct backlight_device *bd)
 
             pr_info("backlight: power on, restore brightness=%d\n", restore);
 
-	        power = true;
+            led_dat->brightness = restore;
+	        led_dat->conf.cdev.brightness = restore;
+	        led_dat->power = true;
 	        brightness = restore;
 	    }
 
-        led_dat->brightness = brightness;
-	    led_dat->conf.cdev.brightness = brightness;
 #ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
         call_notifier(1, led_dat);
 #endif
@@ -409,7 +403,6 @@ static int led_data_init(struct device *dev, struct mtk_led_data *s_led)
 	s_led->conf.level = s_led->conf.cdev.max_brightness;
 	s_led->last_level = s_led->conf.cdev.max_brightness;
 	s_led->power = true;
-	s_led->after_boot = false;
 
 	ret = snprintf(s_led->debug.buffer + strlen(s_led->debug.buffer),
 		4095 - strlen(s_led->debug.buffer),
