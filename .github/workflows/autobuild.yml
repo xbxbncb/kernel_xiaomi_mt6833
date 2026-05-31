@@ -34,12 +34,25 @@ jobs:
       CCACHE_MAXSIZE: 20G
       ARCH: arm64
       SUBARCH: arm
+      KSU_VER: ${{ github.event.inputs.ksuversion || '3.0.0' }}
+      SUSFS_VER: ${{ github.event.inputs.susfsversion || '2.0.0' }}
+      KER_VER: ${{ github.event.inputs.kernelversion || '4.14.356-openela-rc1' }}
 
     steps:
     - name: Checkout ${{ matrix.branch }} branch Code
       uses: actions/checkout@v4
       with:
         ref: ${{ matrix.branch }}
+
+    - name: Generate Dynamic Version
+      run: |
+        if [ -n "${{ github.event.inputs.version }}" ]; then
+          echo "REL_VER=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+        else
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DATE_STR=$(date +'%y%m%d')
+          echo "REL_VER=v${DATE_STR}" >> $GITHUB_ENV
+        fi
 
     - name: Install Dependencies & toolchain
       run: |
@@ -122,11 +135,11 @@ jobs:
           evergo_defconfig
 
         if [ ${{ matrix.branch }} == ksunext-susfs ]; then
-          VERSION="${{ github.event.inputs.version }}-ksunext-${{ github.event.inputs.ksuversion }}-susfs-${{ github.event.inputs.susfsversion }}"
+          VERSION="${{ env.REL_VER }}-ksunext-${{ env.KSU_VER }}-susfs-${{ env.SUSFS_VER }}"
         elif [ ${{ matrix.branch }} == ksunext ]; then
-          VERSION="${{ github.event.inputs.version }}-ksunext-${{ github.event.inputs.ksuversion }}"
+          VERSION="${{ env.REL_VER }}-ksunext-${{ env.KSU_VER }}"
         else
-          VERSION="${{ github.event.inputs.version }}"
+          VERSION="${{ env.REL_VER }}"
         fi
 
         echo "-${VERSION}" > .scmversion
@@ -167,21 +180,21 @@ jobs:
         sed -i 's/device\.name1=.*/device.name1=evergo/' anykernel.sh
         sed -i '/device\.name[2-5]=.*/d' anykernel.sh
         if [ ${{ matrix.branch }} == ksunext ]; then
-          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel ${{ github.event.inputs.kernelversion }} (${{ github.event.inputs.version }}) patched KernelSU Next ${{ github.event.inputs.ksuversion }} by 酷安@孤独不能/' anykernel.sh
+          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel ${{ env.KER_VER }} (${{ env.REL_VER }}) patched KernelSU Next ${{ env.KSU_VER }} by 酷安@孤独不能/' anykernel.sh
         elif [ ${{ matrix.branch }} == ksunext-susfs ]; then
-          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel ${{ github.event.inputs.kernelversion }} (${{ github.event.inputs.version }}) patched KernelSU Next ${{ github.event.inputs.ksuversion }} and SUSFS ${{ github.event.inputs.susfsversion }} by 酷安@孤独不能/' anykernel.sh
+          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel ${{ env.KER_VER }} (${{ env.REL_VER }}) patched KernelSU Next ${{ env.KSU_VER }} and SUSFS ${{ env.SUSFS_VER }} by 酷安@孤独不能/' anykernel.sh
         else
-          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel ${{ github.event.inputs.kernelversion }} (${{ github.event.inputs.version }}) by 酷安@孤独不能/' anykernel.sh
+          sed -i 's/kernel\.string=.*/kernel.string=Linux Kernel ${{ env.KER_VER }} (${{ env.REL_VER }}) by 酷安@孤独不能/' anykernel.sh
         fi
         sed -i 's/BLOCK=.*/BLOCK=boot/' anykernel.sh
         sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=auto/' anykernel.sh
         
         if [ ${{ matrix.branch }} == ksunext ]; then
-          zip -r ../AnyKernel3-evergo-${{ github.event.inputs.version }}-ksunext-${{ github.event.inputs.ksuversion }}.zip *
+          zip -r ../AnyKernel3-evergo-${{ env.REL_VER }}-ksunext-${{ env.KSU_VER }}.zip *
         elif [ ${{ matrix.branch }} == ksunext-susfs ]; then
-          zip -r ../AnyKernel3-evergo-${{ github.event.inputs.version }}-ksunext-${{ github.event.inputs.ksuversion }}-susfs-${{ github.event.inputs.susfsversion }}.zip *
+          zip -r ../AnyKernel3-evergo-${{ env.REL_VER }}-ksunext-${{ env.KSU_VER }}-susfs-${{ env.SUSFS_VER }}.zip *
         elif [ ${{ matrix.branch }} == main ]; then
-          zip -r ../AnyKernel3-evergo-${{ github.event.inputs.version }}-main.zip *
+          zip -r ../AnyKernel3-evergo-${{ env.REL_VER }}-main.zip *
         fi
         cd ..
 
