@@ -909,6 +909,21 @@ config RT_GROUP_SCHED
 	  realtime bandwidth for them.
 	  See Documentation/scheduler/sched-rt-group.txt for more information.
 
+config SCHEDTUNE_CPUCTL_SYNC
+	bool "Sync schedtune cgroup changes to cpuctl groups"
+	depends on SCHED_TUNE
+	help
+	  When a task is moved between schedtune cgroups (e.g. by
+	  Android's ActivityManager), automatically move it to the
+	  corresponding cpuctl cgroup so that cfs_bandwidth limits
+	  take effect immediately.
+
+	  This is useful on devices where Android's framework sets
+	  schedtune groups but does not set cpuctl groups, causing
+	  background processes to run without CPU bandwidth limits.
+
+	  If unsure, say N.
+
 endif #CGROUP_SCHED
 
 config UCLAMP_TASK_GROUP
