@@ -6,6 +6,12 @@
 #include <linux/rcupdate.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_SCHEDTUNE_CPUCTL_SYNC
+#include <linux/workqueue.h>
+#include <linux/fs.h>
+#include <linux/file.h>
+#endif
+
 #include <trace/events/sched.h>
 
 #include "sched.h"
@@ -16,6 +22,123 @@ extern struct reciprocal_value schedtune_spc_rdiv;
 
 /* We hold schedtune boost in effect for at least this long */
 #define SCHEDTUNE_BOOST_HOLD_NS 50000000ULL
+
+#ifdef CONFIG_SCHEDTUNE_CPUCTL_SYNC
+/*
+ * cpuctl cgroup synchronization for schedtune.
+ *
+ * When CONFIG_SCHEDTUNE_CPUCTL_SYNC is enabled, moving a task into a
+ * schedtune group will asynchronously also move it into the matching
+ * cpuctl cgroup.  This ensures cfs_bandwidth limits apply immediately
+ * to background/foreground transitions without requiring a userspace
+ * polling daemon.
+ *
+ * Implementation uses VFS (filp_open + kernel_write) to avoid
+ * cgroup_mutex deadlocks: schedtune_can_attach() is called with
+ * cgroup_mutex already held, so we cannot call cgroup_attach_task()
+ * (which also takes cgroup_mutex) directly.  Instead we defer the
+ * work to a high-priority workqueue, which writes to
+ * /dev/cpuctl/<group>/cgroup.procs in its own context.
+ */
+
+static struct workqueue_struct *cpuctl_sync_wq;
+
+struct cpuctl_sync_work {
+	struct work_struct work;
+	pid_t pid;
+	char group_name[32];
+};
+
+/*
+ * st_to_cpuctl - map schedtune group name to cpuctl group name.
+ *
+ * Returns the cpuctl group name for well-known schedtune groups.
+ * Returns NULL for unknown/unnamed groups (including the root group),
+ * in which case the task is NOT moved — this is critical because
+ * system processes without a schedtune assignment (init, zygote,
+ * servicemanager, etc.) must not be throttled.
+ */
+static const char *st_to_cpuctl(const char *st_name)
+{
+	if (!st_name || !*st_name)
+		return NULL;
+	if (!strcmp(st_name, "top-app"))           return "top-app";
+	if (!strcmp(st_name, "foreground"))        return "foreground";
+	if (!strcmp(st_name, "background"))        return "background";
+	if (!strcmp(st_name, "system-background")) return "background";
+	if (!strcmp(st_name, "restricted"))        return "background";
+	/* Unknown group — do not touch */
+	return NULL;
+}
+
+/*
+ * cpuctl_sync_work_fn - workqueue callback that writes pid to
+ * /dev/cpuctl/<group>/cgroup.procs via VFS.
+ *
+ * Runs in workqueue context with no cgroup locks held, so the
+ * cgroup.procs write handler (which takes cgroup_mutex internally)
+ * is safe to call.
+ */
+static void cpuctl_sync_work_fn(struct work_struct *work)
+{
+	struct cpuctl_sync_work *sw =
+		container_of(work, struct cpuctl_sync_work, work);
+	struct file *f;
+	char path[64];
+	char pid_str[12];
+	loff_t pos = 0;
+	int len;
+
+	len = snprintf(pid_str, sizeof(pid_str), "%d", sw->pid);
+	snprintf(path, sizeof(path), "/dev/cpuctl/%s/cgroup.procs",
+		 sw->group_name);
+
+	f = filp_open(path, O_WRONLY, 0);
+	if (IS_ERR(f))
+		goto out;
+
+	kernel_write(f, pid_str, len, &pos);
+	filp_close(f, NULL);
+
+out:
+	kfree(sw);
+}
+
+/*
+ * schedtune_sync_cpuctl - schedule async cpuctl migration for a task.
+ *
+ * Called from schedtune_can_attach() after all rq/spin locks are released.
+ * Looks up the schedtune group name from the css, maps it to a cpuctl
+ * group, and if a mapping exists, queues a work item to perform the
+ * actual cgroup migration.
+ *
+ * No-ops (returns immediately) for unmapped groups — system processes
+ * that are not assigned to any schedtune child group will never be moved.
+ */
+static void schedtune_sync_cpuctl(struct task_struct *p,
+				   struct cgroup_subsys_state *css)
+{
+	struct cpuctl_sync_work *sw;
+	const char *ct_name;
+
+	if (!css || !css->cgroup || !css->cgroup->kn)
+		return;
+
+	ct_name = st_to_cpuctl(css->cgroup->kn->name);
+	if (!ct_name)
+		return;  /* no mapping — leave the task alone */
+
+	/* GFP_ATOMIC: we may be called from various scheduler contexts */
+	sw = kzalloc(sizeof(*sw), GFP_ATOMIC);
+	if (!sw)
+		return;
+
+	INIT_WORK(&sw->work, cpuctl_sync_work_fn);
+	sw->pid = p->pid;
+	strlcpy(sw->group_name, ct_name, sizeof(sw->group_name));
+	queue_work(cpuctl_sync_wq, &sw->work);
+}
+#endif /* CONFIG_SCHEDTUNE_CPUCTL_SYNC */
 
 /*
  * EAS scheduler tunables for task groups.
@@ -607,6 +730,16 @@ int schedtune_can_attach(struct cgroup_taskset *tset)
 
 		raw_spin_unlock(&bg->lock);
 		task_rq_unlock(rq, task, &rq_flags);
+
+#ifdef CONFIG_SCHEDTUNE_CPUCTL_SYNC
+		/*
+		 * All locks released — safe to schedule async cpuctl sync.
+		 * The workqueue will write the task's pid to the matching
+		 * cpuctl cgroup via VFS, which internally takes its own
+		 * cgroup_mutex without conflict.
+		 */
+		schedtune_sync_cpuctl(task, css);
+#endif
 	}
 
 	return 0;
@@ -946,6 +1079,21 @@ schedtune_init(void)
 
 	schedtune_spc_rdiv = reciprocal_value(100);
 	schedtune_init_cgroups();
+
+#ifdef CONFIG_SCHEDTUNE_CPUCTL_SYNC
+	/*
+	 * Create a high-priority unbound workqueue for async cpuctl migration.
+	 * WQ_HIGHPRI ensures work items are processed almost immediately.
+	 * WQ_UNBOUND allows work to run on any CPU, avoiding contention
+	 * with the scheduler path that queued it.
+	 */
+	cpuctl_sync_wq = alloc_workqueue("stune_cpuctl_sync",
+					 WQ_UNBOUND | WQ_HIGHPRI, 0);
+	if (!cpuctl_sync_wq)
+		pr_err("schedtune: failed to create cpuctl_sync workqueue\n");
+	else
+		pr_info("schedtune: cpuctl sync enabled\n");
+#endif
 
 	return 0;
 }
